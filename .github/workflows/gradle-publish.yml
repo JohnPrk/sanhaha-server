@@ -8,7 +8,9 @@
 env:
   S3_BUCKET_NAME: sanhaha-springboot-webservice
   PROJECT_NAME: sanhaha-server
-  
+  CODE_DEPLOY_APP_NAME: sanhaha-springboot-webservice
+  CODE_DEPLOY_GROUP_NAME: sanhaha-springboot-webservice-group
+
 name: deploy
 
 on:
@@ -17,6 +19,7 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+
 
 jobs:
   build:
@@ -34,36 +37,40 @@ jobs:
       with:
         java-version: '8'
         distribution: 'temurin'
-    
+        
     - name: Grant execute permission for gradlew
       run: chmod +x ./gradlew
       shell: bash
-    
+
     - name: Build with Gradle
       run: ./gradlew clean build -x test
       shell: bash
-    
-    - name: Get current Time
+      
+    - name: Get current time
       uses: 1466587594/get-current-time@v2
       id: current-time
       with:
         format: YYYY-MM-DDTHH-mm-ss
         utcOffset: "+09:00"
-    
+
     - name: Show Current Time
       run: echo "CurrentTime=${{steps.current-time.outputs.formattedTime}}"
       shell: bash
-    
+
     - name: Make zip file
       run: zip -r ./$PROJECT_NAME.zip .
       shell: bash
-      
+    
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v1
       with:
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-access-key-id: ${{secrets.AWS_ACCESS_KEY_ID}}
+        aws-secret-access-key: ${{secrets.AWS_SECRET_ACCESS_KEY}}
         aws-region: ap-northeast-2
-    
+        
+
     - name: Upload to S3
       run: aws s3 cp --region ap-northeast-2 ./$PROJECT_NAME.zip s3://$S3_BUCKET_NAME/$PROJECT_NAME/$PROJECT_NAME.zip
+
+    - name: Code Deploy
+      run: aws deploy create-deployment --application-name $CODE_DEPLOY_APP_NAME --deployment-config-name CodeDeployDefault.AllAtOnce --deployment-group-name $CODE_DEPLOY_GROUP_NAME --s3-location bucket=$S3_BUCKET_NAME,bundleType=zip,key=$PROJECT_NAME/$PROJECT_NAME.zip
